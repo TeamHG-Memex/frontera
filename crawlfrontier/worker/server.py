@@ -150,3 +150,9 @@ class WorkerJsonRpcService(JsonRpcService):
         root.putChild('status', StatusResource(worker))
         root.putChild('jsonrpc', JsonRpcResource(worker))
         JsonRpcService.__init__(self, root, settings)
+        self.worker = worker
+
+    def start_listening(self):
+        JsonRpcService.start_listening(self)
+        address = self.port.getHost()
+        self.worker.set_process_info("%s:%d" % (address.host, address.port))

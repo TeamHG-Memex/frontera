@@ -7,6 +7,7 @@ from twisted.internet import reactor
 from kafka import KafkaClient, KeyedProducer, SimpleConsumer
 from kafka.common import OffsetOutOfRangeError
 from kafka.protocol import CODEC_SNAPPY
+from kazoo.client import KazooClient, KazooState
 
 from crawlfrontier.contrib.backends.remote.codecs.msgpack import Decoder, Encoder
 from crawlfrontier.core.manager import FrontierManager
@@ -90,6 +91,28 @@ class FrontierWorker(object):
                          settings.get('NEW_BATCH_DELAY', 60.0), no_incoming)
         self.job_id = 0
         self.stats = {}
+        self.init_zookeeper()
+
+    def init_zookeeper(self):
+        self._zk = KazooClient(hosts=settings.get('ZOOKEEPER_LOCATION'))
+        self._zk.add_listener(self.zookeeper_listener)
+        self._zk.start()
+        self.znode_path = self._zk.create("/frontera/fworker", ephemeral=True, sequence=True, makepath=True)
+
+    def zookeeper_listener(self, state):
+        if state == KazooState.LOST:
+            # Register somewhere that the session was lost
+            pass
+        elif state == KazooState.SUSPENDED:
+            # Handle being disconnected from Zookeeper
+            pass
+        else:
+            # Handle being connected/reconnected to Zookeeper
+            pass
+
+    def set_process_info(self, process_info):
+        self.process_info = process_info
+        self._zk.set(self.znode_path, self.process_info)
 
     def run(self):
         self.slot.schedule(on_start=True)
